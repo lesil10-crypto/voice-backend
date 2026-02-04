@@ -185,14 +185,35 @@ app.post('/api/transcribe-audio', upload.single('audio'), async (req, res) => {
 
     uploadedFilePath = req.file.path;
     console.log('📁 업로드:', req.file.originalname, `(${(req.file.size / 1024 / 1024).toFixed(2)}MB)`);
+    console.log('📝 파일 정보:', {
+      mimetype: req.file.mimetype,
+      path: uploadedFilePath,
+      size: req.file.size
+    });
 
     // Whisper API 전사
     console.log('🎤 Whisper API 전사 시작...');
     
+    // 파일 확장자 결정
+    let fileExtension = '.webm';
+    if (req.file.mimetype) {
+      if (req.file.mimetype.includes('mp4')) fileExtension = '.m4a';
+      else if (req.file.mimetype.includes('mpeg')) fileExtension = '.mp3';
+      else if (req.file.mimetype.includes('wav')) fileExtension = '.wav';
+    } else if (req.file.originalname) {
+      const ext = req.file.originalname.split('.').pop().toLowerCase();
+      if (['mp3', 'wav', 'm4a', 'mp4', 'webm', 'ogg'].includes(ext)) {
+        fileExtension = '.' + ext;
+      }
+    }
+    
+    const filename = `audio_${Date.now()}${fileExtension}`;
+    console.log('📎 전송 파일명:', filename);
+    
     const formData = new FormData();
     formData.append('file', fs.createReadStream(uploadedFilePath), {
-      filename: req.file.originalname,
-      contentType: req.file.mimetype || 'audio/mpeg'
+      filename: filename,
+      contentType: req.file.mimetype || 'audio/webm'
     });
     formData.append('model', 'whisper-1');
     formData.append('language', 'ko');
