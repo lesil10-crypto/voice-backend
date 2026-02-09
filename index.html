@@ -1,0 +1,677 @@
+<!DOCTYPE html>
+<html lang="ko">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>실시간 음성 전사 (AAC 버전)</title>
+    <style>
+        * {
+            margin: 0;
+            padding: 0;
+            box-sizing: border-box;
+        }
+
+        body {
+            font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', 'Noto Sans KR', sans-serif;
+            background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+            min-height: 100vh;
+            padding: 20px;
+        }
+
+        .container {
+            max-width: 800px;
+            margin: 0 auto;
+            background: white;
+            border-radius: 20px;
+            box-shadow: 0 20px 60px rgba(0,0,0,0.3);
+            padding: 40px;
+        }
+
+        h1 {
+            text-align: center;
+            color: #667eea;
+            margin-bottom: 30px;
+            font-size: 28px;
+        }
+
+        .timer {
+            text-align: center;
+            font-size: 48px;
+            font-weight: bold;
+            color: #333;
+            margin-bottom: 30px;
+            font-variant-numeric: tabular-nums;
+        }
+
+        .info-box {
+            background: #f0f4f8;
+            border-left: 4px solid #667eea;
+            padding: 20px;
+            border-radius: 8px;
+            margin-bottom: 30px;
+        }
+
+        .info-box h3 {
+            color: #667eea;
+            margin-bottom: 10px;
+        }
+
+        .info-box ul {
+            margin-left: 20px;
+            color: #555;
+            line-height: 1.8;
+        }
+
+        .controls {
+            display: grid;
+            grid-template-columns: 1fr 1fr;
+            gap: 15px;
+            margin-bottom: 30px;
+        }
+
+        .btn {
+            padding: 15px 30px;
+            border: none;
+            border-radius: 12px;
+            font-size: 16px;
+            font-weight: bold;
+            cursor: pointer;
+            transition: all 0.3s ease;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            gap: 10px;
+        }
+
+        .btn:hover:not(:disabled) {
+            transform: translateY(-2px);
+            box-shadow: 0 5px 15px rgba(0,0,0,0.2);
+        }
+
+        .btn-start {
+            background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+            color: white;
+        }
+
+        .btn-stop {
+            background: linear-gradient(135deg, #f093fb 0%, #f5576c 100%);
+            color: white;
+        }
+
+        .btn-transcribe {
+            background: linear-gradient(135deg, #4facfe 0%, #00f2fe 100%);
+            color: white;
+        }
+
+        .btn-cancel {
+            background: #e0e0e0;
+            color: #666;
+        }
+
+        .btn:disabled {
+            opacity: 0.5;
+            cursor: not-allowed;
+            transform: none;
+        }
+
+        .upload-section {
+            background: #f9fafb;
+            border: 2px dashed #ccc;
+            border-radius: 12px;
+            padding: 30px;
+            text-align: center;
+            margin-bottom: 30px;
+        }
+
+        .upload-section h3 {
+            margin-bottom: 15px;
+            color: #333;
+        }
+
+        .file-input-wrapper {
+            position: relative;
+            display: inline-block;
+            margin-bottom: 15px;
+        }
+
+        .file-input-wrapper input[type="file"] {
+            position: absolute;
+            opacity: 0;
+            width: 0;
+            height: 0;
+        }
+
+        .file-input-label {
+            padding: 12px 24px;
+            background: #667eea;
+            color: white;
+            border-radius: 8px;
+            cursor: pointer;
+            display: inline-block;
+            font-weight: bold;
+            transition: background 0.3s ease;
+        }
+
+        .file-input-label:hover {
+            background: #5568d3;
+        }
+
+        .file-name {
+            margin-top: 10px;
+            color: #666;
+            font-size: 14px;
+        }
+
+        .usage-guide {
+            background: #fff9e6;
+            border-left: 4px solid #ffd700;
+            padding: 20px;
+            border-radius: 8px;
+            margin-bottom: 30px;
+        }
+
+        .usage-guide h3 {
+            color: #ff9800;
+            margin-bottom: 10px;
+        }
+
+        .usage-guide ul {
+            margin-left: 20px;
+            color: #666;
+            line-height: 1.8;
+        }
+
+        .transcription-section {
+            margin-top: 30px;
+        }
+
+        .transcription-section h2 {
+            color: #333;
+            margin-bottom: 15px;
+            font-size: 20px;
+        }
+
+        .transcription-box {
+            background: #f9fafb;
+            border: 1px solid #e0e0e0;
+            border-radius: 12px;
+            padding: 20px;
+            min-height: 200px;
+            max-height: 400px;
+            overflow-y: auto;
+            font-size: 16px;
+            line-height: 1.8;
+            color: #333;
+            white-space: pre-wrap;
+        }
+
+        .error-message {
+            background: #fee;
+            color: #c00;
+            padding: 15px;
+            border-radius: 8px;
+            margin-top: 15px;
+            border-left: 4px solid #c00;
+        }
+
+        .loading {
+            text-align: center;
+            padding: 20px;
+            color: #667eea;
+            font-weight: bold;
+        }
+
+        .format-badge {
+            display: inline-block;
+            background: #4caf50;
+            color: white;
+            padding: 4px 12px;
+            border-radius: 12px;
+            font-size: 12px;
+            font-weight: bold;
+            margin-left: 10px;
+        }
+
+        .api-status {
+            text-align: center;
+            padding: 10px;
+            margin-bottom: 20px;
+            border-radius: 8px;
+            font-size: 14px;
+        }
+
+        .api-status.connected {
+            background: #e8f5e9;
+            color: #2e7d32;
+        }
+
+        .api-status.disconnected {
+            background: #ffebee;
+            color: #c62828;
+        }
+
+        @keyframes pulse {
+            0%, 100% { opacity: 1; }
+            50% { opacity: 0.5; }
+        }
+
+        .recording-indicator {
+            animation: pulse 1.5s ease-in-out infinite;
+        }
+    </style>
+</head>
+<body>
+    <div class="container">
+        <h1>🎤 실시간 음성 전사 <span class="format-badge">AAC 형식</span></h1>
+
+        <div id="apiStatus" class="api-status disconnected">
+            🔄 백엔드 API 연결 확인 중...
+        </div>
+
+        <div class="timer" id="timer">00:00:00</div>
+
+        <div class="info-box">
+            <h3>✨ 자동 전사 기능:</h3>
+            <ul>
+                <li><strong>녹음 형식</strong>: AAC 코덱 (Whisper AI와 완벽 호환)</li>
+                <li><strong>파일 전사</strong>: OpenAI Whisper API를 통한 고품질 한국어 전사 (최대 25MB)</li>
+                <li><strong>분리 배포</strong>: 프론트엔드(GitHub Pages) + 백엔드(Render)</li>
+                <li><strong>전사 결과</strong>: 문단 단위로 정리되어 표시</li>
+            </ul>
+        </div>
+
+        <div class="controls">
+            <button class="btn btn-start" id="startBtn" onclick="startRecording()">
+                🎙️ 녹음 시작
+            </button>
+            <button class="btn btn-stop" id="stopBtn" onclick="stopRecording()" disabled>
+                ⏹️ 녹음 중지 및 저장
+            </button>
+            <button class="btn btn-transcribe" id="transcribeBtn" onclick="transcribeRecording()" disabled>
+                📝 음성파일 전사 (Whisper AI)
+            </button>
+            <button class="btn btn-cancel" id="cancelBtn" onclick="cancelRecording()" disabled>
+                ❌ 초기화
+            </button>
+        </div>
+
+        <div class="upload-section">
+            <h3>📁 파일 업로드 후 전사 (AAC, MP3, WAV, M4A, WebM 지원)</h3>
+            <div class="file-input-wrapper">
+                <input type="file" id="fileInput" accept=".aac,.mp3,.wav,.m4a,.webm,.mp4,.mpeg,.mpga,.oga,.ogg,.flac" onchange="handleFileSelect()">
+                <label for="fileInput" class="file-input-label">파일 선택</label>
+            </div>
+            <div class="file-name" id="fileName">선택된 파일 없음</div>
+            <button class="btn btn-transcribe" id="uploadTranscribeBtn" onclick="transcribeUploadedFile()" disabled style="margin-top: 15px;">
+                📝 선택한 파일 전사
+            </button>
+        </div>
+
+        <div class="usage-guide">
+            <h3>💡 사용 방법:</h3>
+            <ul>
+                <li><strong>녹음</strong>: 시작 후 자유롭게 말씀하세요.</li>
+                <li><strong>파일 전사</strong>: MP3, WAV, M4A, WebM 등 업로드하여 전사 가능</li>
+                <li><strong>최대 파일 크기</strong>: 25MB (Whisper API 제한)</li>
+            </ul>
+        </div>
+
+        <div class="transcription-section">
+            <h2>AI 전사 결과</h2>
+            <div class="transcription-box" id="transcriptionBox">
+                <span style="color: #999;">파일 업로드나 녹음 후 크게 말씀하시면 됩니다.</span>
+            </div>
+            <div id="errorMessage"></div>
+        </div>
+    </div>
+
+    <!-- API 설정 로드 -->
+    <script src="config.js"></script>
+    
+    <script>
+        let mediaRecorder;
+        let audioChunks = [];
+        let audioBlob;
+        let timerInterval;
+        let seconds = 0;
+        let uploadedFile = null;
+
+        // API 연결 확인
+        async function checkApiConnection() {
+            try {
+                const response = await fetch(`${API_BASE_URL}/health`);
+                const data = await response.json();
+                
+                if (data.status === 'ok') {
+                    document.getElementById('apiStatus').className = 'api-status connected';
+                    document.getElementById('apiStatus').textContent = '✅ 백엔드 API 연결됨';
+                    return true;
+                }
+            } catch (error) {
+                console.error('API 연결 실패:', error);
+                document.getElementById('apiStatus').className = 'api-status disconnected';
+                document.getElementById('apiStatus').textContent = '❌ 백엔드 API 연결 실패 - 잠시 후 다시 시도하세요';
+                return false;
+            }
+        }
+
+        // 페이지 로드 시 API 연결 확인
+        window.addEventListener('load', async () => {
+            await checkApiConnection();
+        });
+
+        // 타이머 업데이트
+        function updateTimer() {
+            seconds++;
+            const hrs = Math.floor(seconds / 3600);
+            const mins = Math.floor((seconds % 3600) / 60);
+            const secs = seconds % 60;
+            document.getElementById('timer').textContent = 
+                `${String(hrs).padStart(2, '0')}:${String(mins).padStart(2, '0')}:${String(secs).padStart(2, '0')}`;
+        }
+
+        // 녹음 시작
+        async function startRecording() {
+            try {
+                const stream = await navigator.mediaDevices.getUserMedia({ 
+                    audio: {
+                        echoCancellation: true,
+                        noiseSuppression: true,
+                        autoGainControl: true
+                    } 
+                });
+
+                let mimeType = '';
+                if (MediaRecorder.isTypeSupported('audio/mp4')) {
+                    mimeType = 'audio/mp4';
+                } else if (MediaRecorder.isTypeSupported('audio/webm;codecs=opus')) {
+                    mimeType = 'audio/webm;codecs=opus';
+                } else if (MediaRecorder.isTypeSupported('audio/webm')) {
+                    mimeType = 'audio/webm';
+                } else {
+                    throw new Error('지원되는 오디오 형식이 없습니다.');
+                }
+
+                mediaRecorder = new MediaRecorder(stream, { 
+                    mimeType: mimeType,
+                    audioBitsPerSecond: 128000
+                });
+
+                audioChunks = [];
+
+                mediaRecorder.ondataavailable = (event) => {
+                    if (event.data.size > 0) {
+                        audioChunks.push(event.data);
+                    }
+                };
+
+                mediaRecorder.onstop = () => {
+                    const mimeType = mediaRecorder.mimeType;
+                    audioBlob = new Blob(audioChunks, { type: mimeType });
+                    stream.getTracks().forEach(track => track.stop());
+                    
+                    document.getElementById('startBtn').disabled = false;
+                    document.getElementById('stopBtn').disabled = true;
+                    document.getElementById('transcribeBtn').disabled = false;
+                    document.getElementById('cancelBtn').disabled = false;
+                };
+
+                mediaRecorder.start();
+                seconds = 0;
+                updateTimer();
+                timerInterval = setInterval(updateTimer, 1000);
+
+                document.getElementById('startBtn').disabled = true;
+                document.getElementById('stopBtn').disabled = false;
+                document.getElementById('cancelBtn').disabled = false;
+                document.getElementById('stopBtn').classList.add('recording-indicator');
+
+                showMessage('🎙️ 녹음이 시작되었습니다.', 'info');
+
+            } catch (error) {
+                console.error('녹음 시작 오류:', error);
+                showError('마이크 접근 권한이 필요합니다.');
+            }
+        }
+
+        // 녹음 중지
+        function stopRecording() {
+            if (mediaRecorder && mediaRecorder.state !== 'inactive') {
+                mediaRecorder.stop();
+                clearInterval(timerInterval);
+                document.getElementById('stopBtn').classList.remove('recording-indicator');
+                
+                setTimeout(() => {
+                    if (audioBlob) {
+                        downloadRecording();
+                    }
+                }, 500);
+            }
+        }
+
+        // 녹음 파일 다운로드
+        function downloadRecording() {
+            if (!audioBlob) {
+                showError('다운로드할 녹음 파일이 없습니다.');
+                return;
+            }
+
+            const url = URL.createObjectURL(audioBlob);
+            const a = document.createElement('a');
+            a.style.display = 'none';
+            a.href = url;
+            
+            const mimeType = audioBlob.type;
+            let extension = 'aac';
+            if (mimeType.includes('mp4')) extension = 'm4a';
+            else if (mimeType.includes('webm')) extension = 'webm';
+            
+            const timestamp = new Date().toISOString().replace(/[:.]/g, '-').slice(0, -5);
+            a.download = `녹음_${timestamp}.${extension}`;
+            
+            document.body.appendChild(a);
+            a.click();
+            document.body.removeChild(a);
+            URL.revokeObjectURL(url);
+
+            showMessage(`✅ 녹음 파일이 다운로드되었습니다.`, 'info');
+        }
+
+        // 전사 실행
+        async function transcribeRecording() {
+            if (!audioBlob) {
+                showError('전사할 녹음 파일이 없습니다.');
+                return;
+            }
+
+            if (audioBlob.size > 25 * 1024 * 1024) {
+                showError('파일 크기가 25MB를 초과합니다.');
+                return;
+            }
+
+            const formData = new FormData();
+            const mimeType = audioBlob.type;
+            let extension = 'aac';
+            if (mimeType.includes('mp4')) extension = 'm4a';
+            else if (mimeType.includes('webm')) extension = 'webm';
+            
+            formData.append('audio', audioBlob, `recording.${extension}`);
+
+            try {
+                showMessage('🔄 Whisper AI로 전사 중입니다...', 'info');
+                document.getElementById('transcribeBtn').disabled = true;
+
+                const response = await fetch(`${API_BASE_URL}/api/transcribe`, {
+                    method: 'POST',
+                    body: formData
+                });
+
+                if (!response.ok) {
+                    const errorData = await response.json();
+                    throw new Error(errorData.error || '전사 요청 실패');
+                }
+
+                const data = await response.json();
+                
+                if (data.text) {
+                    document.getElementById('transcriptionBox').textContent = data.text;
+                    showMessage('✅ 전사가 완료되었습니다!', 'success');
+                    addDownloadButton(data.text);
+                } else {
+                    showError('전사 결과가 비어있습니다.');
+                }
+
+            } catch (error) {
+                console.error('전사 오류:', error);
+                showError(`전사 오류: ${error.message}`);
+            } finally {
+                document.getElementById('transcribeBtn').disabled = false;
+            }
+        }
+
+        // 파일 선택
+        function handleFileSelect() {
+            const fileInput = document.getElementById('fileInput');
+            const fileName = document.getElementById('fileName');
+            const uploadTranscribeBtn = document.getElementById('uploadTranscribeBtn');
+
+            if (fileInput.files.length > 0) {
+                uploadedFile = fileInput.files[0];
+                fileName.textContent = `선택됨: ${uploadedFile.name} (${(uploadedFile.size / 1024 / 1024).toFixed(2)} MB)`;
+                uploadTranscribeBtn.disabled = false;
+
+                if (uploadedFile.size > 25 * 1024 * 1024) {
+                    showError('파일 크기가 25MB를 초과합니다.');
+                    uploadTranscribeBtn.disabled = true;
+                }
+            } else {
+                uploadedFile = null;
+                fileName.textContent = '선택된 파일 없음';
+                uploadTranscribeBtn.disabled = true;
+            }
+        }
+
+        // 업로드 파일 전사
+        async function transcribeUploadedFile() {
+            if (!uploadedFile) {
+                showError('파일을 먼저 선택해주세요.');
+                return;
+            }
+
+            const formData = new FormData();
+            formData.append('audio', uploadedFile);
+
+            try {
+                showMessage('🔄 Whisper AI로 전사 중입니다...', 'info');
+                document.getElementById('uploadTranscribeBtn').disabled = true;
+
+                const response = await fetch(`${API_BASE_URL}/api/transcribe`, {
+                    method: 'POST',
+                    body: formData
+                });
+
+                if (!response.ok) {
+                    const errorData = await response.json();
+                    throw new Error(errorData.error || '전사 요청 실패');
+                }
+
+                const data = await response.json();
+                
+                if (data.text) {
+                    document.getElementById('transcriptionBox').textContent = data.text;
+                    showMessage('✅ 전사가 완료되었습니다!', 'success');
+                    addDownloadButton(data.text);
+                } else {
+                    showError('전사 결과가 비어있습니다.');
+                }
+
+            } catch (error) {
+                console.error('전사 오류:', error);
+                showError(`전사 오류: ${error.message}`);
+            } finally {
+                document.getElementById('uploadTranscribeBtn').disabled = false;
+            }
+        }
+
+        // 초기화
+        function cancelRecording() {
+            if (mediaRecorder && mediaRecorder.state !== 'inactive') {
+                mediaRecorder.stop();
+            }
+            
+            clearInterval(timerInterval);
+            seconds = 0;
+            audioChunks = [];
+            audioBlob = null;
+            uploadedFile = null;
+            
+            document.getElementById('timer').textContent = '00:00:00';
+            document.getElementById('transcriptionBox').innerHTML = '<span style="color: #999;">파일 업로드나 녹음 후 크게 말씀하시면 됩니다.</span>';
+            document.getElementById('errorMessage').innerHTML = '';
+            document.getElementById('fileName').textContent = '선택된 파일 없음';
+            document.getElementById('fileInput').value = '';
+            
+            document.getElementById('startBtn').disabled = false;
+            document.getElementById('stopBtn').disabled = true;
+            document.getElementById('transcribeBtn').disabled = true;
+            document.getElementById('cancelBtn').disabled = true;
+            document.getElementById('uploadTranscribeBtn').disabled = true;
+            document.getElementById('stopBtn').classList.remove('recording-indicator');
+
+            showMessage('🔄 초기화되었습니다.', 'info');
+        }
+
+        // 메시지 표시
+        function showMessage(message, type) {
+            const errorDiv = document.getElementById('errorMessage');
+            errorDiv.innerHTML = `<div style="background: ${type === 'success' ? '#e8f5e9' : '#e3f2fd'}; color: ${type === 'success' ? '#2e7d32' : '#1565c0'}; padding: 15px; border-radius: 8px; margin-top: 15px; border-left: 4px solid ${type === 'success' ? '#4caf50' : '#2196f3'};">${message}</div>`;
+            
+            setTimeout(() => {
+                errorDiv.innerHTML = '';
+            }, 5000);
+        }
+
+        // 에러 표시
+        function showError(message) {
+            const errorDiv = document.getElementById('errorMessage');
+            errorDiv.innerHTML = `<div class="error-message">${message}</div>`;
+        }
+
+        // 다운로드 버튼 추가
+        function addDownloadButton(text) {
+            const transcriptionSection = document.querySelector('.transcription-section');
+            const existingBtn = document.getElementById('downloadTranscriptBtn');
+            if (existingBtn) existingBtn.remove();
+
+            const downloadBtn = document.createElement('button');
+            downloadBtn.id = 'downloadTranscriptBtn';
+            downloadBtn.className = 'btn btn-transcribe';
+            downloadBtn.style.marginTop = '15px';
+            downloadBtn.style.width = '100%';
+            downloadBtn.textContent = '📥 전사 결과 다운로드 (TXT)';
+            downloadBtn.onclick = () => downloadTranscript(text);
+
+            transcriptionSection.appendChild(downloadBtn);
+        }
+
+        // 전사 결과 다운로드
+        function downloadTranscript(text) {
+            const blob = new Blob([text], { type: 'text/plain;charset=utf-8' });
+            const url = URL.createObjectURL(blob);
+            const a = document.createElement('a');
+            a.style.display = 'none';
+            a.href = url;
+            
+            const timestamp = new Date().toISOString().replace(/[:.]/g, '-').slice(0, -5);
+            a.download = `전사결과_${timestamp}.txt`;
+            
+            document.body.appendChild(a);
+            a.click();
+            document.body.removeChild(a);
+            URL.revokeObjectURL(url);
+
+            showMessage('✅ 전사 결과가 다운로드되었습니다.', 'success');
+        }
+    </script>
+</body>
+</html>
